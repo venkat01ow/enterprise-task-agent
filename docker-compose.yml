@@ -1,0 +1,10 @@
+services:
+  api:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - LLM_PROVIDER=mock
+      - USE_MOCK_TOOLS=true
+      - ENVIRONMENT=docker
+    restart: unless-stopped
