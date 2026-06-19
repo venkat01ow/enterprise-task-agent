@@ -47,6 +47,8 @@ class Settings(BaseSettings):
     session_secret: str = "dev-insecure-change-me"
     session_cookie: str = "eta_session"
     session_https_only: bool = False
+    session_max_age_seconds: int = 8 * 3600        # how long a sign-in lasts
+    token_refresh_skew_seconds: int = 300          # refresh the access token this early
 
     # ── Microsoft Graph ──
     graph_base_url: str = "https://graph.microsoft.com/v1.0"
@@ -56,6 +58,39 @@ class Settings(BaseSettings):
     # the Accenture connector calls real endpoints instead of staying inert.
     accenture_api_base_url: str = ""
     accenture_api_scope: str = ""
+
+    # ── Server ──
+    host: str = "127.0.0.1"
+    port: int = 8000
+
+    # ── Persistence ──
+    # SQLite path for the durable task history + audit trail. Use a mounted
+    # volume in production. ':memory:' keeps everything in process memory.
+    db_path: str = "data/app.db"
+
+    # ── CORS ── (comma-separated origins; empty = same-origin only)
+    cors_allow_origins: str = ""
+
+    # ── Security headers ──
+    csp_policy: str = (
+        "default-src 'self'; img-src 'self' data:; script-src 'self'; "
+        "style-src 'self' 'unsafe-inline'; connect-src 'self'; "
+        "frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+    )
+    hsts_enabled: bool | None = None               # None → on in production
+    trusted_hosts: str = ""                         # comma-separated; empty = any host
+
+    # ── Rate limiting (per client IP, in-process) ──
+    rate_limit_enabled: bool = True
+    rate_limit_requests: int = 120
+    rate_limit_window_seconds: int = 60
+
+    # ── Observability ──
+    log_level: str = "INFO"
+    log_json: bool = False
+
+    # ── API docs ── (None → disabled in production)
+    enable_docs: bool | None = None
 
     # Misc
     request_timeout_seconds: float = 30.0
@@ -78,6 +113,54 @@ class Settings(BaseSettings):
     @property
     def authority(self) -> str:
         return f"https://login.microsoftonline.com/{self.entra_tenant_id}"
+
+    @property
+    def is_production(self) -> bool:
+        return self.environment.strip().lower() in {"production", "prod"}
+
+    @property
+    def secure_cookies(self) -> bool:
+        """Cookies are marked Secure in production or when explicitly requested."""
+        return self.session_https_only or self.is_production
+
+    @property
+    def hsts_active(self) -> bool:
+        return self.hsts_enabled if self.hsts_enabled is not None else self.is_production
+
+    @property
+    def docs_enabled(self) -> bool:
+        return self.enable_docs if self.enable_docs is not None else not self.is_production
+
+    @property
+    def cors_origins_list(self) -> list[str]:
+        return [o.strip() for o in self.cors_allow_origins.split(",") if o.strip()]
+
+    @property
+    def trusted_hosts_list(self) -> list[str]:
+        return [h.strip() for h in self.trusted_hosts.split(",") if h.strip()]
+
+    def validate_runtime(self) -> list[str]:
+        """Fail fast on insecure production config; return non-fatal warnings.
+
+        Raises RuntimeError for unsafe production secrets so the app refuses to
+        boot with an insecure configuration.
+        """
+        warnings: list[str] = []
+        if not self.is_production:
+            return warnings
+        if self.session_secret == "dev-insecure-change-me" or len(self.session_secret) < 32:
+            raise RuntimeError(
+                "SESSION_SECRET must be a strong random value (>= 32 chars) in production."
+            )
+        if (
+            self.auth_enabled
+            and self.entra_redirect_uri.startswith("http://")
+            and "localhost" not in self.entra_redirect_uri
+        ):
+            warnings.append("ENTRA_REDIRECT_URI should use https in production.")
+        if self.cors_allow_origins.strip() == "*":
+            warnings.append("CORS is open to '*'; restrict CORS_ALLOW_ORIGINS in production.")
+        return warnings
 
 
 settings = Settings()

@@ -33,7 +33,9 @@ class GraphClient:
             "Content-Type": "application/json",
         }
 
-    def _request(self, method: str, path: str, payload: dict[str, Any] | None = None) -> dict[str, Any]:
+    def _request(
+        self, method: str, path: str, payload: dict[str, Any] | None = None
+    ) -> dict[str, Any]:
         url = f"{self._base}{path}"
         try:
             with httpx.Client(timeout=self._timeout) as client:
@@ -90,14 +92,19 @@ class GraphClient:
         }
         self._request("POST", "/me/sendMail", payload)
 
-    def create_todo_task(self, title: str, note: str = "", due_date: str | None = None) -> dict[str, Any]:
+    def create_todo_task(
+        self, title: str, note: str = "", due_date: str | None = None
+    ) -> dict[str, Any]:
         """Create a Microsoft To-Do task in the user's default list."""
         list_id = self._default_todo_list_id()
         payload: dict[str, Any] = {"title": title}
         if note:
             payload["body"] = {"contentType": "text", "content": note}
         if due_date:
-            payload["dueDateTime"] = {"dateTime": f"{due_date}T17:00:00", "timeZone": settings.default_timezone}
+            payload["dueDateTime"] = {
+                "dateTime": f"{due_date}T17:00:00",
+                "timeZone": settings.default_timezone,
+            }
         return self._request("POST", f"/me/todo/lists/{list_id}/tasks", payload)
 
     def _default_todo_list_id(self) -> str:

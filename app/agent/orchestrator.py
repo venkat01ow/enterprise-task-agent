@@ -8,8 +8,9 @@ from __future__ import annotations
 
 import asyncio
 import uuid
+from collections.abc import AsyncIterator
 from datetime import datetime, timezone
-from typing import Any, AsyncIterator
+from typing import Any
 
 from app.agent.planner import plan as make_plan
 from app.agent.schemas import StepResult, TaskRun

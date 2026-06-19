@@ -23,7 +23,7 @@ class ITRequestTool(Tool):
         return self._run_mock(params, user)
 
     def _run_real(self, params: dict[str, Any], user: dict[str, Any], token: str) -> ToolResult:
-        from app.connectors.graph import GraphClient, GraphError
+        from app.connectors.graph import GraphClient
 
         summary_text = str(params.get("summary", "IT support request")).strip()
         category = str(params.get("category", "general"))

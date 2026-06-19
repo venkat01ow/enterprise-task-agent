@@ -1,28 +1,37 @@
-"""In-memory task-run history store.
+"""Durable task-run history store (SQLite-backed).
 
-Kept intentionally simple (process memory) so the demo has zero external
-dependencies. Swap with a database by replacing these functions.
+Persists every task run so history survives restarts and deploys. The public
+API is unchanged from the original in-memory version, so call sites and tests
+remain identical.
 """
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-if TYPE_CHECKING:
-    from app.agent.schemas import TaskRun
-
-_TASKS: list["TaskRun"] = []
+from app.agent.schemas import TaskRun
+from app.core import db
 
 
-def save_task(task: "TaskRun") -> None:
-    """Persist a completed task run (newest first)."""
-    _TASKS.insert(0, task)
+def save_task(task: TaskRun) -> None:
+    """Persist a completed task run."""
+    db.execute(
+        "INSERT OR REPLACE INTO tasks (id, user_id, message, status, created_at, payload) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            task.id,
+            task.user_id,
+            task.message,
+            task.status,
+            task.created_at.isoformat(),
+            task.model_dump_json(),
+        ),
+    )
 
 
-def all_tasks() -> list["TaskRun"]:
+def all_tasks() -> list[TaskRun]:
     """Return all task runs, newest first."""
-    return list(_TASKS)
+    rows = db.query("SELECT payload FROM tasks ORDER BY created_at DESC, rowid DESC")
+    return [TaskRun.model_validate_json(row["payload"]) for row in rows]
 
 
 def clear() -> None:
-    """Clear stored tasks (used in tests)."""
-    _TASKS.clear()
+    """Delete all stored tasks (used in tests)."""
+    db.execute("DELETE FROM tasks")

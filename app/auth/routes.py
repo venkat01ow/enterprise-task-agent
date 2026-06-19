@@ -48,12 +48,15 @@ def callback(request: Request) -> RedirectResponse:
         return RedirectResponse("/auth/login")
 
     try:
-        result = entra.complete_auth_flow(flow, dict(request.query_params))
+        result, token_cache, home_account_id = entra.complete_auth_flow(
+            flow, dict(request.query_params)
+        )
     except ValueError as exc:
         raise HTTPException(status_code=401, detail=str(exc)) from exc
 
     claims = result.get("id_token_claims", {})
     expires_in = int(result.get("expires_in", 3600))
+    now = time.time()
     sid = create_session(
         {
             "oid": claims.get("oid") or claims.get("sub", "unknown"),
@@ -61,7 +64,10 @@ def callback(request: Request) -> RedirectResponse:
             "email": claims.get("preferred_username") or claims.get("email", ""),
             "role": entra.resolve_role(claims),
             "access_token": result["access_token"],
-            "expires_at": time.time() + expires_in - 60,
+            "expires_at": now + expires_in - 60,
+            "token_cache": token_cache,
+            "home_account_id": home_account_id,
+            "session_expires_at": now + settings.session_max_age_seconds,
         }
     )
     request.session["sid"] = sid

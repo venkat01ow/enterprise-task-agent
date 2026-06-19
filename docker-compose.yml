@@ -4,7 +4,27 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - LLM_PROVIDER=mock
-      - USE_MOCK_TOOLS=true
-      - ENVIRONMENT=docker
+      # Production fails fast unless a strong secret is provided.
+      - ENVIRONMENT=production
+      - PORT=8000
+      - DB_PATH=/app/data/app.db
+      - SESSION_SECRET=${SESSION_SECRET:?set SESSION_SECRET to a 32+ char random string}
+      - SESSION_HTTPS_ONLY=${SESSION_HTTPS_ONLY:-false}
+      - LOG_JSON=${LOG_JSON:-true}
+      # Microsoft sign-in (optional) — see docs/AUTH_SETUP.md
+      - ENTRA_TENANT_ID=${ENTRA_TENANT_ID:-}
+      - ENTRA_CLIENT_ID=${ENTRA_CLIENT_ID:-}
+      - ENTRA_CLIENT_SECRET=${ENTRA_CLIENT_SECRET:-}
+      - ENTRA_REDIRECT_URI=${ENTRA_REDIRECT_URI:-http://localhost:8000/auth/callback}
+    volumes:
+      - eta-data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/health').status==200 else 1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
     restart: unless-stopped
+
+volumes:
+  eta-data:

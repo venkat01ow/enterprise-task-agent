@@ -2,16 +2,16 @@
 from __future__ import annotations
 
 import json
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 from fastapi import APIRouter, Query, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 
 from app.agent.orchestrator import iter_task_events, run_task
 from app.agent.schemas import ChatRequest, TaskRun
 from app.auth.identity import build_user
 from app.config import settings
-from app.core import audit
+from app.core import audit, db
 from app.core.store import all_tasks
 from app.tools import all_tools
 
@@ -20,6 +20,7 @@ router = APIRouter(prefix="/api")
 
 @router.get("/health")
 def health() -> dict[str, object]:
+    """Liveness probe — process is up. No external dependencies checked."""
     return {
         "status": "ok",
         "app": settings.app_name,
@@ -28,6 +29,18 @@ def health() -> dict[str, object]:
         "llm_enabled": settings.llm_enabled,
         "llm_provider": settings.llm_provider,
     }
+
+
+@router.get("/ready")
+def ready() -> JSONResponse:
+    """Readiness probe — checks dependencies (database) before taking traffic."""
+    db_ok = db.ping()
+    checks = {"database": db_ok}
+    ready_now = all(checks.values())
+    return JSONResponse(
+        status_code=200 if ready_now else 503,
+        content={"status": "ready" if ready_now else "not_ready", "checks": checks},
+    )
 
 
 @router.get("/tools")

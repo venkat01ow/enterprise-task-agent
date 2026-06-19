@@ -136,11 +136,45 @@ no bypassing access controls).
 
 ---
 
+## Production deployment
+
+This app is production-hardened, not just a demo:
+
+- **Durable persistence** — task history and the audit trail are stored in
+  **SQLite** (WAL mode) and survive restarts; the storage layer is isolated so
+  it can be swapped for Postgres/Redis when scaling out.
+- **Server-side sessions + silent token refresh** — access tokens stay on the
+  server and are refreshed automatically via MSAL before they expire.
+- **Security headers** — CSP, HSTS, `X-Frame-Options`, `X-Content-Type-Options`,
+  `Referrer-Policy`, and more on every response.
+- **Per-IP rate limiting** with `429` + `Retry-After`.
+- **Structured JSON logging** with a per-request `X-Request-ID`.
+- **Health & readiness probes** — `GET /api/health` (liveness) and
+  `GET /api/ready` (DB check, `503` when not ready).
+- **Fail-fast guards** — in `ENVIRONMENT=production` the app refuses to start
+  with a missing/weak `SESSION_SECRET`, disables `/docs`, and forces secure cookies.
+- **Container-ready** — multi-stage `Dockerfile` (non-root, healthcheck) served by
+  **gunicorn + uvicorn workers**, plus a `docker-compose.yml` with a data volume.
+- **CI** — GitHub Actions runs `ruff` + `pytest` on every push/PR.
+
+```bash
+# Generate a strong secret and launch the hardened container
+export SESSION_SECRET="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+docker compose up --build -d
+curl http://localhost:8000/api/ready
+```
+
+▶ **Full guide:** [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — configuration, secrets,
+HTTPS, scaling, backups, and a production checklist.
+
+---
+
 ## Architecture & docs
 
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — components, data flow, extension points
 - [docs/AUTH_SETUP.md](docs/AUTH_SETUP.md) — Microsoft Entra ID sign-in + Microsoft 365 setup
 - [docs/CONNECTORS.md](docs/CONNECTORS.md) — real vs. mock actions and enterprise API extension points
+- [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) — production configuration, scaling, backups, checklist
 - [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) — exact demo walkthrough for judges
 
 ## Project layout
@@ -154,11 +188,12 @@ enterprise-task-agent/
 │   ├── auth/                # Entra ID (MSAL) sign-in, session store, identity
 │   ├── connectors/          # Microsoft Graph client (real M365 actions)
 │   ├── tools/               # tool plugins (real + mock) + registry
-│   ├── core/                # rbac, audit, in-memory store
+│   ├── core/                # rbac, audit, SQLite store, db, logging, middleware
 │   └── api/                 # REST + SSE routes
 ├── frontend/                # vanilla chat UI with Microsoft sign-in (no build step)
 ├── tests/                   # pytest suite
 ├── run.py                   # dev launcher
+├── gunicorn_conf.py         # production server config
 ├── Dockerfile / docker-compose.yml
 └── requirements*.txt
 ```

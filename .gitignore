@@ -18,6 +18,12 @@ env/
 
 # Test / coverage
 .pytest_cache/
+.ruff_cache/
+
+# Application data (SQLite store)
+data/
+*.db
+*.sqlite3
 .coverage
 htmlcov/
 coverage.xml

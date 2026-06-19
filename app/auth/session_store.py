@@ -25,15 +25,20 @@ def create_session(data: dict[str, Any]) -> str:
 
 
 def get_session(sid: str | None) -> dict[str, Any] | None:
-    """Return session data, or None if missing/expired."""
+    """Return session data, or None if missing/expired.
+
+    Expiry is governed by the *session* lifetime (``session_expires_at``), not
+    the short-lived access token — tokens are refreshed silently in the identity
+    layer while the session is still valid.
+    """
     if not sid:
         return None
     data = _SESSIONS.get(sid)
     if data is None:
         return None
-    expires_at = data.get("expires_at", 0)
-    if expires_at and time.time() >= expires_at:
-        # Token expired: drop the session so the user is asked to re-authenticate.
+    session_expires_at = data.get("session_expires_at", 0)
+    if session_expires_at and time.time() >= session_expires_at:
+        # Session lifetime elapsed: drop it so the user re-authenticates.
         _SESSIONS.pop(sid, None)
         return None
     return data
@@ -47,3 +52,8 @@ def update_session(sid: str, data: dict[str, Any]) -> None:
 def delete_session(sid: str | None) -> None:
     if sid:
         _SESSIONS.pop(sid, None)
+
+
+def clear() -> None:
+    """Drop all sessions (used in tests)."""
+    _SESSIONS.clear()

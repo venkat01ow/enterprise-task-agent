@@ -1,14 +1,16 @@
-"""Append-only audit trail with sensitive-value redaction.
+"""Append-only audit trail with sensitive-value redaction (SQLite-backed).
 
-Every tool invocation (allowed, denied, or failed) is recorded so the agent's
-actions are traceable — a key governance requirement for enterprise adoption.
+Every tool invocation (allowed, denied, or failed) is recorded durably so the
+agent's actions are traceable across restarts — a key governance and compliance
+requirement for enterprise adoption.
 """
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from typing import Any
 
-_AUDIT: list[dict[str, Any]] = []
+from app.core import db
 
 _SENSITIVE_KEYS = {"password", "passwd", "token", "secret", "ssn", "api_key", "apikey"}
 
@@ -26,23 +28,38 @@ def redact(params: dict[str, Any]) -> dict[str, Any]:
 
 def record(user: dict[str, Any], tool: str, status: str, params: dict[str, Any]) -> None:
     """Append an audit entry for a tool invocation."""
-    _AUDIT.append(
-        {
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "user_id": user.get("user_id", "unknown"),
-            "role": user.get("role", "unknown"),
-            "tool": tool,
-            "status": status,
-            "params": redact(params or {}),
-        }
+    db.execute(
+        "INSERT INTO audit (timestamp, user_id, role, tool, status, params) "
+        "VALUES (?, ?, ?, ?, ?, ?)",
+        (
+            datetime.now(timezone.utc).isoformat(),
+            user.get("user_id", "unknown"),
+            user.get("role", "unknown"),
+            tool,
+            status,
+            json.dumps(redact(params or {})),
+        ),
     )
 
 
 def all_entries() -> list[dict[str, Any]]:
     """Return audit entries, newest first."""
-    return list(reversed(_AUDIT))
+    rows = db.query(
+        "SELECT timestamp, user_id, role, tool, status, params FROM audit ORDER BY id DESC"
+    )
+    return [
+        {
+            "timestamp": row["timestamp"],
+            "user_id": row["user_id"],
+            "role": row["role"],
+            "tool": row["tool"],
+            "status": row["status"],
+            "params": json.loads(row["params"]),
+        }
+        for row in rows
+    ]
 
 
 def clear() -> None:
-    """Clear the audit trail (used in tests)."""
-    _AUDIT.clear()
+    """Delete the audit trail (used in tests)."""
+    db.execute("DELETE FROM audit")

@@ -1,0 +1,28 @@
+# Version control & CI
+.git/
+.github/
+.gitignore
+
+# Python caches / envs
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+
+# Local data & secrets (never bake into the image)
+data/
+*.db
+*.sqlite3
+.env
+.env.*
+!.env.example
+
+# Dev-only files
+tests/
+docs/
+*.md
+!README.md
