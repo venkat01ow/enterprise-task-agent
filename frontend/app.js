@@ -7,6 +7,8 @@ const sendBtn = document.getElementById("send");
 const roleSelect = document.getElementById("role");
 const statusDot = document.getElementById("status-dot");
 
+const authState = { authEnabled: false, authenticated: false, user: null };
+
 const STATUS_ICON = { completed: "✓", failed: "✕", denied: "⛔" };
 
 function scrollToBottom() {
@@ -113,8 +115,9 @@ function sendMessage(text) {
   setBusy(true);
 
   const view = addAgentMessage();
-  const params = new URLSearchParams({ message, role: roleSelect.value });
-  const source = new EventSource(`/api/chat/stream?${params.toString()}`);
+  const role = authState.authEnabled ? (authState.user && authState.user.role) || "employee" : roleSelect.value;
+  const params = new URLSearchParams({ message, role });
+  const source = new EventSource(`/api/chat/stream?${params.toString()}`, { withCredentials: true });
 
   source.addEventListener("plan", (e) => {
     const data = JSON.parse(e.data);
@@ -161,4 +164,62 @@ document.getElementById("suggestions").addEventListener("click", (e) => {
   if (chip) sendMessage(chip.dataset.prompt);
 });
 
-input.focus();
+// ── Authentication bootstrap ──────────────────────────────────────────
+function setGated(gated) {
+  input.disabled = gated;
+  sendBtn.disabled = gated;
+  if (!gated) input.focus();
+}
+
+function applyAuthState() {
+  const roleWrap = document.getElementById("role-wrap");
+  const userChip = document.getElementById("user-chip");
+  const loginBtn = document.getElementById("login-btn");
+  const gate = document.getElementById("auth-gate");
+  const modeNote = document.getElementById("mode-note");
+
+  if (!authState.authEnabled) {
+    roleWrap && roleWrap.classList.remove("hidden");
+    userChip && userChip.classList.add("hidden");
+    loginBtn && loginBtn.classList.add("hidden");
+    gate && gate.classList.add("hidden");
+    if (modeNote) modeNote.textContent = "Dev mode — mock actions (no sign-in configured).";
+    setGated(false);
+    return;
+  }
+
+  roleWrap && roleWrap.classList.add("hidden");
+  if (authState.authenticated && authState.user) {
+    const name = authState.user.name || "User";
+    document.getElementById("user-name").textContent = name;
+    document.getElementById("user-role").textContent = authState.user.role || "employee";
+    document.getElementById("user-initial").textContent = (name[0] || "U").toUpperCase();
+    userChip && userChip.classList.remove("hidden");
+    loginBtn && loginBtn.classList.add("hidden");
+    gate && gate.classList.add("hidden");
+    if (modeNote) modeNote.textContent = "Signed in — real Microsoft 365 actions enabled.";
+    setGated(false);
+  } else {
+    userChip && userChip.classList.add("hidden");
+    loginBtn && loginBtn.classList.remove("hidden");
+    gate && gate.classList.remove("hidden");
+    if (modeNote) modeNote.textContent = "Sign in required.";
+    setGated(true);
+  }
+}
+
+async function bootstrapAuth() {
+  try {
+    const res = await fetch("/auth/status", { credentials: "same-origin" });
+    const data = await res.json();
+    authState.authEnabled = !!data.auth_enabled;
+    authState.authenticated = !!data.authenticated;
+    authState.user = data.user || null;
+  } catch (err) {
+    // If status can't be loaded, fall back to offline dev behavior.
+    authState.authEnabled = false;
+  }
+  applyAuthState();
+}
+
+bootstrapAuth();

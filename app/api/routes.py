@@ -4,11 +4,12 @@ from __future__ import annotations
 import json
 from typing import AsyncIterator
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import StreamingResponse
 
 from app.agent.orchestrator import iter_task_events, run_task
 from app.agent.schemas import ChatRequest, TaskRun
+from app.auth.identity import build_user
 from app.config import settings
 from app.core import audit
 from app.core.store import all_tasks
@@ -23,6 +24,7 @@ def health() -> dict[str, object]:
         "status": "ok",
         "app": settings.app_name,
         "environment": settings.environment,
+        "auth_enabled": settings.auth_enabled,
         "llm_enabled": settings.llm_enabled,
         "llm_provider": settings.llm_provider,
     }
@@ -34,20 +36,26 @@ def list_tools() -> dict[str, object]:
 
 
 @router.post("/chat", response_model=TaskRun)
-def chat(request: ChatRequest) -> TaskRun:
-    """Plan and execute a request synchronously, returning the full task run."""
-    user = {"user_id": request.user_id, "role": request.role}
-    return run_task(request.message, user)
+def chat(payload: ChatRequest, request: Request) -> TaskRun:
+    """Plan and execute a request synchronously, returning the full task run.
+
+    When Microsoft sign-in is configured, the acting user (and their Graph
+    access token) is taken from the authenticated session; the role/user_id in
+    the request body are ignored. In offline dev mode the body values are used.
+    """
+    user = build_user(request, dev_role=payload.role, dev_user_id=payload.user_id)
+    return run_task(payload.message, user)
 
 
 @router.get("/chat/stream")
 async def chat_stream(
+    request: Request,
     message: str = Query(..., min_length=1, max_length=2000),
     role: str = Query("employee"),
     user_id: str = Query("u-001"),
 ) -> StreamingResponse:
     """Stream progressive task events as Server-Sent Events (SSE)."""
-    user = {"user_id": user_id, "role": role}
+    user = build_user(request, dev_role=role, dev_user_id=user_id)
 
     async def event_source() -> AsyncIterator[str]:
         async for event in iter_task_events(message, user):

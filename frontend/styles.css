@@ -374,3 +374,151 @@ body {
 .app-footer a:hover {
   color: var(--accent);
 }
+
+/* ── Auth: utility, user chip, sign-in button, gate ───────────────── */
+.hidden {
+  display: none !important;
+}
+
+.role-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 4px 6px 4px 4px;
+}
+
+.user-avatar {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: #06222f;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.user-meta {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.user-name {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.user-role {
+  color: var(--text-muted);
+  font-size: 11px;
+  text-transform: capitalize;
+}
+
+.signout {
+  margin-left: 4px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-decoration: none;
+  border: 1px solid var(--border);
+}
+
+.signout:hover {
+  color: var(--text);
+  border-color: var(--accent);
+}
+
+.ms-signin {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  background: #2f2f2f;
+  color: #fff;
+  text-decoration: none;
+  font-weight: 600;
+  font-size: 14px;
+  padding: 10px 16px;
+  border-radius: 6px;
+  border: 1px solid #1b1b1b;
+}
+
+.ms-signin:hover {
+  background: #404040;
+}
+
+.ms-signin.small {
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+.ms-logo {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  background-image: linear-gradient(#f25022 0 0), linear-gradient(#7fba00 0 0),
+    linear-gradient(#00a4ef 0 0), linear-gradient(#ffb900 0 0);
+  background-repeat: no-repeat;
+  background-size: 7px 7px;
+  background-position: 0 0, 9px 0, 0 9px, 9px 9px;
+}
+
+.auth-gate {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: radial-gradient(1000px 500px at 50% -10%, #15294a 0%, rgba(15, 23, 42, 0.96) 60%);
+  backdrop-filter: blur(4px);
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 420px;
+  text-align: center;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 36px 32px;
+}
+
+.auth-card .brand-mark.big {
+  font-size: 40px;
+}
+
+.auth-card h2 {
+  margin: 12px 0 8px;
+  font-size: 22px;
+}
+
+.auth-card p {
+  margin: 0 0 20px;
+  color: var(--text-muted);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.auth-card .ms-signin {
+  width: 100%;
+  justify-content: center;
+}
+
+.auth-note {
+  margin: 18px 0 0 !important;
+  font-size: 12px !important;
+}
